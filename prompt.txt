@@ -1,0 +1,62 @@
+I want to build a full-stack Personal Finance Manager web app with the following features:
+
+🔹 Core Features:
+1. Add expenses with description, amount, date, and category (Food, Travel, Shopping, Others).
+2. Add income (simple form for pocket money, allowance, gifts).
+3. Display all transactions (income + expenses) in a unified list.
+4. Show a dashboard summary:
+   - Total Income
+   - Total Expenses
+   - Remaining Balance (Income – Expenses)
+5. Expense-focused reports:
+   - Pie chart → Expenses by category
+   - Bar/Line chart → Expenses vs Income over time
+   - Balance progress bar showing how much of pocket money is left
+   - Insights: biggest expense category, monthly savings/overspending
+6. Budget tracking:
+   - User sets monthly spending budget
+   - Alerts at 70%, 100%, over budget
+7. Export reports (CSV and PDF)
+
+🔹 Advanced Features:
+- User accounts (email + password login with JWT authentication).
+- Recurring expenses (like subscriptions).
+- Dark mode toggle.
+- Responsive mobile-friendly layout.
+- Save all data to MongoDB.
+
+🔹 Tech Stack:
+- Frontend: React + Vite, Tailwind CSS, React Hook Form + Yup (validation), Recharts (charts).
+- Backend: Node.js + Express, MongoDB with Mongoose.
+- Authentication: JWT.
+- Reports Export: json2csv for CSV, jspdf for PDF.
+
+🔹 Database Models:
+User:
+- id
+- name
+- email
+- password (hashed)
+
+Transaction:
+- id
+- userId
+- type (income | expense)
+- description
+- amount
+- category
+- date
+
+Now, generate the code step by step:
+1. Setup project structure (frontend + backend).
+2. Implement backend APIs for user auth (register/login), add transaction, fetch transactions, delete transaction.
+3. Implement frontend pages:
+   - Login/Register
+   - Dashboard with summary + charts
+   - Transaction list (filter, search, delete, edit)
+   - Add Transaction form
+   - Reports page (charts + export CSV/PDF)
+4. Style everything with Tailwind for a clean modern UI.
+5. Integrate Recharts for visualization.
+6. Implement PDF/CSV export for reports.
+
