@@ -6,22 +6,39 @@
   html {
     font-family: 'Inter', system-ui, sans-serif;
   }
+  body {
+    @apply dark:bg-surface-900 bg-gray-50;
+    background-image: theme('backgroundImage.radial-grid');
+    background-attachment: fixed;
+    @apply dark:text-gray-100 text-gray-900;
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+  
+  /* Dark mode styles */
+  .dark {
+    color-scheme: dark;
+  }
+  
+  /* Light mode styles */
+  :root:not(.dark) {
+    color-scheme: light;
+  }
 }
 
 @layer components {
   .btn-primary {
-    @apply bg-primary-600 hover:bg-primary-700 text-white font-medium py-2 px-4 rounded-lg transition-colors;
+    @apply bg-primary-600 hover:bg-primary-700 text-white font-medium py-2 px-4 rounded-lg transition-colors shadow-glow;
   }
   
   .btn-secondary {
-    @apply bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded-lg transition-colors;
+    @apply bg-surface-700 hover:bg-surface-600 text-gray-100 font-medium py-2 px-4 rounded-lg transition-colors;
   }
   
   .input-field {
-    @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent;
+    @apply w-full px-3 py-2 border border-surface-600 bg-surface-800 text-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent placeholder-gray-400;
   }
   
   .card {
-    @apply bg-white dark:bg-gray-800 rounded-lg shadow-md p-6;
+    @apply bg-surface-800/80 backdrop-blur rounded-2xl shadow-card p-6 border border-surface-600;
   }
 }

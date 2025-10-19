@@ -1,6 +1,5 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
-import { useState, useEffect } from 'react'
-import { AuthProvider, useAuth } from './contexts/AuthContext'
+import { Routes, Route, Navigate } from 'react-router-dom'
+import { useAuth } from './contexts/AuthContext'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import Dashboard from './pages/Dashboard'
@@ -15,7 +14,7 @@ function AppRoutes() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary-600"></div>
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-cyan-500"></div>
       </div>
     )
   }
@@ -27,7 +26,7 @@ function AppRoutes() {
       <Route path="/" element={user ? <Layout /> : <Navigate to="/login" />}>
         <Route index element={<Dashboard />} />
         <Route path="transactions" element={<Transactions />} />
-        <Route path="add-transaction" element={<AddTransaction />} />
+        <Route path="add" element={<AddTransaction />} />
         <Route path="reports" element={<Reports />} />
       </Route>
     </Routes>
@@ -35,15 +34,7 @@ function AppRoutes() {
 }
 
 function App() {
-  return (
-    <AuthProvider>
-      <Router>
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-          <AppRoutes />
-        </div>
-      </Router>
-    </AuthProvider>
-  )
+  return <AppRoutes />
 }
 
 export default App

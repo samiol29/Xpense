@@ -18,23 +18,13 @@ app.use('/api/auth', authRoutes);
 app.use('/api/transactions', txRoutes);
 app.use('/api/budget', budgetRoutes);
 
-let mongoUri = process.env.MONGO_URI;
-if (!mongoUri) {
-  const mem = await MongoMemoryServer.create();
-  mongoUri = mem.getUri();
-  console.log('Using in-memory MongoDB at', mongoUri);
-}
+// Use in-memory MongoDB for development (MongoDB Atlas has SSL issues)
+console.log('Using in-memory MongoDB for development');
+const mem = await MongoMemoryServer.create();
+const mongoUri = mem.getUri();
+console.log('Using in-memory MongoDB at', mongoUri);
 
-// Connection options to fix SSL issues
-const options = {
-  tls: true,
-  tlsAllowInvalidCertificates: true,
-  tlsAllowInvalidHostnames: true,
-  retryWrites: true,
-  w: 'majority'
-};
-
-await mongoose.connect(mongoUri, options);
+await mongoose.connect(mongoUri);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });

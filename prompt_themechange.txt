@@ -1,0 +1,36 @@
+We already have the basic expense manager implemented with:
+- A form to add income/expenses
+- A list of transactions
+- A summary of total income, total expenses, and balance
+- Basic charts for expenses by category and overall flow
+
+Now, refactor and restyle the frontend into a modern dashboard UI inspired by the reference image provided. Do not remove the existing functionality, only improve the styling and structure.
+
+🎨 Styling Requirements:
+- Use Tailwind CSS for a sleek, responsive dark-themed UI.
+- Add a left sidebar with navigation icons (Dashboard, Transactions, Categories, Settings).
+- Add a top navigation bar with a search bar and user profile section.
+- Dashboard layout should include:
+  1. **Revenue Flow (bar chart)** → Monthly income vs expenses.
+  2. **Available (donut chart)** → Expenses breakdown by category.
+  3. **Income and Expense summary cards** → Show weekly/monthly totals with percentage changes.
+  4. **My Card section** → Display total balance.
+  5. **Transactions list** → Scrollable, styled list with icons for categories.
+  6. **Spending trend (line chart)** → Balance trend over time.
+- Use neumorphic or glassmorphism-like card styles with gradients and soft shadows.
+
+📊 Data Binding:
+- All charts and cards should use the existing transaction data from state/localStorage.
+- Do not hardcode chart data; connect it dynamically to the transactions.
+- Show demo data only if no transactions exist.
+
+⚡ Functionality:
+- Keep add/edit/delete transaction features intact.
+- Make charts update dynamically when new transactions are added.
+- Ensure responsive layout (desktop + mobile).
+- Keep the balance calculation accurate: Balance = Total Income - Total Expenses.
+
+Deliverables:
+- Refactored React components: Sidebar, Navbar, Dashboard, TransactionList, Charts, SummaryCards.
+- Updated Tailwind styles to match the modern dashboard design.
+- Fully functional UI that mirrors the reference style while preserving the current CRUD logic.
