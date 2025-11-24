@@ -12,7 +12,12 @@ import {
   Sun,
   ChevronDown,
   Search,
-  Bell
+  Bell,
+  Target,
+  BarChart3,
+  Repeat,
+  CreditCard,
+  Users
 } from 'lucide-react'
 
 export default function Layout() {
@@ -24,13 +29,19 @@ export default function Layout() {
   const sidebarNav = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
     { name: 'Transactions', href: '/transactions', icon: Receipt },
-    { name: 'Categories', href: '/reports', icon: Layers },
-    { name: 'Settings', href: '/reports', icon: Settings, disabled: true },
+    { name: 'Budgets', href: '/budgets', icon: Target },
+    { name: 'Analytics', href: '/analytics', icon: BarChart3 },
+    { name: 'Recurring', href: '/recurring', icon: Repeat },
+    { name: 'Subscriptions', href: '/subscriptions', icon: CreditCard },
+    { name: 'Groups', href: '/groups', icon: Users },
+    { name: 'Reports', href: '/reports', icon: Layers },
   ]
 
   const mobileNav = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
     { name: 'Transactions', href: '/transactions', icon: Receipt },
+    { name: 'Budgets', href: '/budgets', icon: Target },
+    { name: 'Analytics', href: '/analytics', icon: BarChart3 },
     { name: 'Reports', href: '/reports', icon: Layers },
   ]
 
