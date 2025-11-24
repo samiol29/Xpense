@@ -1,104 +1,108 @@
-import { createContext, useContext, useState, useEffect } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react'
 
 const CurrencyContext = createContext()
 
-export function useCurrency() {
-  return useContext(CurrencyContext)
-}
+const SUPPORTED_CURRENCIES = [
+  { code: 'USD', symbol: '$', name: 'US Dollar', locale: 'en-US' },
+  { code: 'INR', symbol: '₹', name: 'Indian Rupee', locale: 'en-IN' },
+  { code: 'EUR', symbol: '€', name: 'Euro', locale: 'de-DE' },
+  { code: 'GBP', symbol: '£', name: 'British Pound', locale: 'en-GB' },
+]
+
+const RATES_ENDPOINT = 'https://open.er-api.com/v6/latest/USD'
 
 export function CurrencyProvider({ children }) {
-  const [currency, setCurrency] = useState(() => {
-    const saved = localStorage.getItem('currency')
-    return saved || 'USD'
-  })
-  
-  const [exchangeRates, setExchangeRates] = useState({})
-  const [loading, setLoading] = useState(false)
-
-  const currencies = [
-    { code: 'USD', symbol: '$', name: 'US Dollar' },
-    { code: 'INR', symbol: '₹', name: 'Indian Rupee' },
-    { code: 'EUR', symbol: '€', name: 'Euro' },
-    { code: 'GBP', symbol: '£', name: 'British Pound' },
-    { code: 'JPY', symbol: '¥', name: 'Japanese Yen' },
-    { code: 'CAD', symbol: 'C$', name: 'Canadian Dollar' },
-    { code: 'AUD', symbol: 'A$', name: 'Australian Dollar' }
-  ]
-
-  // Fetch exchange rates from a free API
-  const fetchExchangeRates = async () => {
-    setLoading(true)
-    try {
-      // Using exchangerate-api.com (free tier)
-      const response = await fetch('https://api.exchangerate-api.com/v4/latest/USD')
-      const data = await response.json()
-      setExchangeRates(data.rates)
-    } catch (error) {
-      console.error('Failed to fetch exchange rates:', error)
-      // Fallback rates (approximate)
-      setExchangeRates({
-        USD: 1,
-        INR: 83.5,
-        EUR: 0.92,
-        GBP: 0.79,
-        JPY: 150,
-        CAD: 1.36,
-        AUD: 1.52
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    fetchExchangeRates()
-    // Refresh rates every hour
-    const interval = setInterval(fetchExchangeRates, 3600000)
-    return () => clearInterval(interval)
-  }, [])
+  const [currency, setCurrency] = useState(() => localStorage.getItem('currency') || 'INR')
+  const [rates, setRates] = useState({ USD: 1 })
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     localStorage.setItem('currency', currency)
   }, [currency])
 
-  const convertAmount = (amount, fromCurrency = 'USD', toCurrency = currency) => {
-    if (!exchangeRates[fromCurrency] || !exchangeRates[toCurrency]) {
-      return amount
+  useEffect(() => {
+    const fetchRates = async () => {
+      try {
+        setLoading(true)
+        const res = await fetch(RATES_ENDPOINT)
+        const data = await res.json()
+
+        if (data.result !== 'success') {
+          throw new Error(data['error-type'] || 'Failed to fetch currency rates')
+        }
+
+        const fetchedRates = { ...data.rates, USD: 1 }
+        setRates(fetchedRates)
+        setError('')
+      } catch (err) {
+        console.error('Currency fetch error:', err)
+        setError('Unable to fetch latest currency rates. Values may be inaccurate.')
+      } finally {
+        setLoading(false)
+      }
     }
-    
-    // Convert to USD first, then to target currency
-    const usdAmount = amount / exchangeRates[fromCurrency]
-    return usdAmount * exchangeRates[toCurrency]
-  }
 
-  const formatAmount = (amount, currencyCode = currency) => {
-    const currencyInfo = currencies.find(c => c.code === currencyCode)
-    const symbol = currencyInfo?.symbol || '$'
-    
-    return `${symbol}${amount.toLocaleString(undefined, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    })}`
-  }
+    fetchRates()
+  }, [])
 
-  const getCurrentCurrency = () => {
-    return currencies.find(c => c.code === currency)
-  }
+  const convertAmount = useCallback(
+    (amount, targetCurrency = currency) => {
+      if (typeof amount !== 'number' || Number.isNaN(amount)) return 0
+      if (!rates[targetCurrency]) return amount
+      return amount * rates[targetCurrency]
+    },
+    [currency, rates]
+  )
+
+  const toBaseAmount = useCallback(
+    (amount, sourceCurrency = currency) => {
+      if (typeof amount !== 'number' || Number.isNaN(amount)) return 0
+      if (!rates[sourceCurrency]) return amount
+      return amount / rates[sourceCurrency]
+    },
+    [currency, rates]
+  )
+
+  const formatAmount = useCallback(
+    (amount, { currencyCode = currency, skipConversion = false } = {}) => {
+      if (typeof amount !== 'number' || Number.isNaN(amount)) return '--'
+      const displayValue = skipConversion ? amount : convertAmount(amount, currencyCode)
+      const locale = SUPPORTED_CURRENCIES.find((curr) => curr.code === currencyCode)?.locale || 'en-US'
+      try {
+        return new Intl.NumberFormat(locale, {
+          style: 'currency',
+          currency: currencyCode,
+          maximumFractionDigits: 2,
+        }).format(displayValue)
+      } catch {
+        return `${currencyCode} ${displayValue.toFixed(2)}`
+      }
+    },
+    [convertAmount, currency]
+  )
+
+  const currentCurrency = useMemo(
+    () => SUPPORTED_CURRENCIES.find((curr) => curr.code === currency) || SUPPORTED_CURRENCIES[0],
+    [currency]
+  )
 
   const value = {
     currency,
     setCurrency,
-    currencies,
-    exchangeRates,
-    loading,
+    currencies: SUPPORTED_CURRENCIES,
+    loadingRates: loading,
+    rates,
+    error,
     convertAmount,
     formatAmount,
-    getCurrentCurrency
+    toBaseAmount,
+    currentCurrency,
   }
 
-  return (
-    <CurrencyContext.Provider value={value}>
-      {children}
-    </CurrencyContext.Provider>
-  )
+  return <CurrencyContext.Provider value={value}>{children}</CurrencyContext.Provider>
+}
+
+export function useCurrency() {
+  return useContext(CurrencyContext)
 }

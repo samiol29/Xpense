@@ -14,10 +14,10 @@ import {
   AlertTriangle,
   CheckCircle
 } from 'lucide-react'
-import { PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, AreaChart, Area } from 'recharts'
 
 export default function Dashboard() {
-  const { formatAmount, convertAmount } = useCurrency()
+  const { formatAmount, convertAmount, toBaseAmount, currency, currentCurrency } = useCurrency()
   const [transactions, setTransactions] = useState([])
   const [loading, setLoading] = useState(true)
   const [budget, setBudget] = useState(0)
@@ -26,24 +26,38 @@ export default function Dashboard() {
   const [percent, setPercent] = useState(0)
   const [budgetLoading, setBudgetLoading] = useState(false)
   const [budgetError, setBudgetError] = useState('')
+  const [budgetInput, setBudgetInput] = useState('')
+  const [isBudgetFocused, setIsBudgetFocused] = useState(false)
 
   useEffect(() => {
-    fetchTransactions()
-    fetchBudget()
+    const init = async () => {
+      setLoading(true)
+      await Promise.all([loadTransactions(), loadBudget()])
+      setLoading(false)
+    }
+    init()
   }, [])
 
-  const fetchTransactions = async () => {
+  useEffect(() => {
+    if (isBudgetFocused) return
+    const converted = convertAmount(budget)
+    if (typeof converted === 'number' && !Number.isNaN(converted)) {
+      setBudgetInput(converted.toFixed(2))
+    } else {
+      setBudgetInput('')
+    }
+  }, [budget, convertAmount, currency, isBudgetFocused])
+
+  const loadTransactions = async () => {
     try {
       const res = await axios.get('/api/transactions')
       setTransactions(res.data)
     } catch (err) {
       console.error('Failed to fetch transactions:', err)
-    } finally {
-      setLoading(false)
     }
   }
 
-  const fetchBudget = async () => {
+  const loadBudget = async () => {
     try {
       const res = await axios.get('/api/budget')
       setBudget(res.data.monthlyBudget)
@@ -52,27 +66,42 @@ export default function Dashboard() {
       setPercent(res.data.percent)
     } catch (err) {
       console.error('Failed to fetch budget:', err)
-    } finally {
-      setLoading(false)
     }
   }
 
-  const updateBudget = async (newBudget) => {
+  const updateBudget = async (baseBudgetValue) => {
     try {
       setBudgetLoading(true)
       setBudgetError('')
-      const budgetValue = Number(newBudget)
-      if (isNaN(budgetValue) || budgetValue < 0) {
-        setBudgetError('Please enter a valid budget amount')
-        return
-      }
-      await axios.put('/api/budget', { monthlyBudget: budgetValue })
-      await fetchBudget()
+      await axios.put('/api/budget', { monthlyBudget: baseBudgetValue })
+      await loadBudget()
     } catch (err) {
       setBudgetError(err.response?.data?.message || 'Failed to update budget')
     } finally {
       setBudgetLoading(false)
     }
+  }
+
+  const handleBudgetInputChange = (e) => {
+    const value = e.target.value
+    if (value === '' || /^\d*(\.\d{0,2})?$/.test(value)) {
+      setBudgetInput(value)
+      if (budgetError) setBudgetError('')
+    }
+  }
+
+  const handleBudgetSave = () => {
+    const numeric = parseFloat(budgetInput)
+    if (Number.isNaN(numeric)) {
+      setBudgetError('Please enter a valid amount')
+      return
+    }
+    if (numeric < 0) {
+      setBudgetError('Budget cannot be negative')
+      return
+    }
+    const baseValue = toBaseAmount(numeric)
+    updateBudget(baseValue)
   }
 
   if (loading) {
@@ -93,6 +122,7 @@ export default function Dashboard() {
     .reduce((sum, t) => sum + t.amount, 0)
 
   const balance = totalIncome - totalExpenses
+  const currencySymbol = currentCurrency?.symbol || '$'
 
   // Prepare data for charts
   const expenseByCategory = transactions
@@ -127,297 +157,458 @@ export default function Dashboard() {
     return acc
   }, [])
 
+  const expenseChartData = expenseByCategory.map((item) => ({
+    ...item,
+    value: convertAmount(item.amount),
+  }))
+
+  const monthlyChartData = monthlyData.map((item) => ({
+    month: item.month,
+    income: convertAmount(item.income),
+    expenses: convertAmount(item.expenses),
+  }))
+
   // Get recent transactions
-  const recentTransactions = transactions
+  const recentTransactions = [...transactions]
     .sort((a, b) => new Date(b.date) - new Date(a.date))
     .slice(0, 5)
 
   // Chart colors
-  const COLORS = ['#22d3ee', '#a855f7', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4']
+  const CATEGORY_COLORS = ['#34d399', '#2dd4bf', '#22d3ee', '#a5b4fc', '#f472b6', '#c084fc', '#facc15']
+  const incomeChange = totalIncome ? ((totalIncome - totalExpenses) / totalIncome) * 100 : 0
+  const expenseChange = totalExpenses ? ((totalExpenses - balance) / Math.max(totalExpenses, 1)) * 100 : 0
+  const balanceTrendData = monthlyChartData.map((item) => ({
+    month: item.month,
+    balance: (item.income || 0) - (item.expenses || 0),
+  }))
+  const totalExpensesConverted = expenseChartData.reduce((sum, item) => sum + (item.value || 0), 0)
 
   return (
-    <div className="space-y-6">
-      {/* Welcome Header */}
-      <div className="text-center mb-8">
-        <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-500 to-purple-500 dark:from-cyan-400 dark:to-purple-400 mb-2">
-          Welcome Back!
-        </h1>
-        <p className="text-gray-600 dark:text-gray-400">Here's your financial overview</p>
+    <div className="space-y-8 text-gray-100">
+      <div>
+        <p className="text-sm uppercase tracking-[0.3em] text-white/50">Overview</p>
+        <h1 className="text-3xl font-semibold mt-2">Financial Pulse</h1>
+        <p className="text-white/60 mt-1">Track revenue, expenses, and habits in one place.</p>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* Total Income */}
-        <div className="bg-gradient-to-br from-emerald-50 to-emerald-100/50 dark:bg-surface-800/80 backdrop-blur-xl rounded-2xl p-6 border border-emerald-200 dark:border-surface-700/50 shadow-glow">
+      {/* Summary cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
+        <div className="glass-panel">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-600 dark:text-gray-400 text-sm font-medium">Total Income</p>
-              <p className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">{formatAmount(totalIncome)}</p>
+              <p className="text-white/60 text-sm">Total Income</p>
+              <p className="text-3xl font-semibold mt-2">{formatAmount(totalIncome)}</p>
             </div>
-            <div className="w-12 h-12 bg-emerald-500/20 rounded-xl flex items-center justify-center border border-emerald-500/40">
-              <TrendingUp className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+            <div className="h-12 w-12 rounded-2xl bg-emerald-400/20 border border-emerald-300/40 flex items-center justify-center">
+              <TrendingUp className="h-6 w-6 text-emerald-300" />
             </div>
           </div>
+          <p className="mt-4 text-sm text-emerald-300 flex items-center gap-1">
+            <ArrowUpRight className="h-4 w-4" />
+            {incomeChange.toFixed(1)}% vs last period
+          </p>
         </div>
-
-        {/* Total Expenses */}
-        <div className="bg-gradient-to-br from-red-50 to-red-100/50 dark:bg-surface-800/80 backdrop-blur-xl rounded-2xl p-6 border border-red-200 dark:border-surface-700/50 shadow-glow">
+        <div className="glass-panel">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-600 dark:text-gray-400 text-sm font-medium">Total Expenses</p>
-              <p className="text-3xl font-bold text-red-600 dark:text-red-400">{formatAmount(totalExpenses)}</p>
+              <p className="text-white/60 text-sm">Total Expenses</p>
+              <p className="text-3xl font-semibold mt-2">{formatAmount(totalExpenses)}</p>
             </div>
-            <div className="w-12 h-12 bg-red-500/20 rounded-xl flex items-center justify-center border border-red-500/40">
-              <TrendingDown className="w-6 h-6 text-red-600 dark:text-red-400" />
+            <div className="h-12 w-12 rounded-2xl bg-rose-400/20 border border-rose-300/40 flex items-center justify-center">
+              <TrendingDown className="h-6 w-6 text-rose-300" />
             </div>
           </div>
+          <p className="mt-4 text-sm text-rose-300 flex items-center gap-1">
+            <ArrowDownRight className="h-4 w-4" />
+            {expenseChange.toFixed(1)}% vs last period
+          </p>
         </div>
-
-        {/* Balance */}
-        <div className="bg-gradient-to-br from-blue-50 to-blue-100/50 dark:bg-surface-800/80 backdrop-blur-xl rounded-2xl p-6 border border-blue-200 dark:border-surface-700/50 shadow-glow">
+        <div className="glass-panel">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-600 dark:text-gray-400 text-sm font-medium">Balance</p>
-              <p className={`text-3xl font-bold ${balance >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+              <p className="text-white/60 text-sm">Balance</p>
+              <p className={`text-3xl font-semibold mt-2 ${balance >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
                 {formatAmount(balance)}
               </p>
             </div>
-            <div className={`w-12 h-12 rounded-xl flex items-center justify-center border ${
-              balance >= 0 ? 'bg-emerald-500/20 border-emerald-500/40' : 'bg-red-500/20 border-red-500/40'
-            }`}>
-              <DollarSign className={`w-6 h-6 ${balance >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`} />
+            <div className="h-12 w-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center">
+              <DollarSign className="h-6 w-6 text-white/80" />
             </div>
           </div>
+          <div className="mt-4 flex items-center gap-2 text-xs text-white/50">
+            <span className="h-2 w-2 rounded-full bg-emerald-300" />
+            Available after bills
+          </div>
         </div>
-
-        {/* Budget Progress */}
-        <div className="bg-gradient-to-br from-cyan-50 to-cyan-100/50 dark:bg-surface-800/80 backdrop-blur-xl rounded-2xl p-6 border border-cyan-200 dark:border-surface-700/50 shadow-glow">
+        <div className="glass-panel">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-600 dark:text-gray-400 text-sm font-medium">Budget Used</p>
-              <p className="text-3xl font-bold text-cyan-600 dark:text-cyan-400">{percent.toFixed(0)}%</p>
+              <p className="text-white/60 text-sm">Budget Used</p>
+              <p className="text-3xl font-semibold mt-2">{percent.toFixed(0)}%</p>
             </div>
-            <div className="w-12 h-12 bg-cyan-500/20 rounded-xl flex items-center justify-center border border-cyan-500/40">
-              <Target className="w-6 h-6 text-cyan-600 dark:text-cyan-400" />
+            <div className="h-12 w-12 rounded-2xl bg-teal-400/20 border border-teal-300/40 flex items-center justify-center">
+              <Target className="h-6 w-6 text-teal-200" />
+            </div>
+          </div>
+          <div className="mt-4 w-full h-2 rounded-full bg-white/10 overflow-hidden">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-300"
+              style={{ width: `${Math.min(percent, 100)}%` }}
+            ></div>
+          </div>
+          <p className="text-xs text-white/50 mt-2">Remaining {formatAmount(Math.max(budget - spent, 0))}</p>
+        </div>
+      </div>
+
+      {/* Charts row */}
+      <div className="grid grid-cols-1 xl:grid-cols-[2fr_1fr] gap-6">
+        <div className="glass-panel">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <p className="text-white/50 text-sm">Revenue Flow</p>
+              <h3 className="text-2xl font-semibold mt-1">Monthly Trends</h3>
+            </div>
+            <span className="pill">{monthlyChartData.length} months</span>
+          </div>
+          {monthlyChartData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={320}>
+              <BarChart data={monthlyChartData}>
+                <defs>
+                  <linearGradient id="incomeGradient" x1="0" x2="0" y1="0" y2="1">
+                    <stop offset="5%" stopColor="#34d399" stopOpacity={0.9} />
+                    <stop offset="95%" stopColor="#0f766e" stopOpacity={0.3} />
+                  </linearGradient>
+                  <linearGradient id="expenseGradient" x1="0" x2="0" y1="0" y2="1">
+                    <stop offset="5%" stopColor="#fb7185" stopOpacity={0.9} />
+                    <stop offset="95%" stopColor="#7f1d1d" stopOpacity={0.3} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
+                <XAxis dataKey="month" stroke="#94a3b8" />
+                <YAxis stroke="#94a3b8" />
+                <Tooltip
+                  contentStyle={{
+                    background: 'rgba(15,23,42,0.9)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: '12px',
+                  }}
+                  formatter={(value, name) => [
+                    formatAmount(value, { skipConversion: true }),
+                    name === 'income' ? 'Income' : 'Expenses',
+                  ]}
+                />
+                <Bar dataKey="income" fill="url(#incomeGradient)" radius={[8, 8, 0, 0]} />
+                <Bar dataKey="expenses" fill="url(#expenseGradient)" radius={[8, 8, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-64 flex flex-col items-center justify-center text-white/40">
+              <TrendingUp className="h-10 w-10 mb-3" />
+              No trend data yet
+            </div>
+          )}
+        </div>
+        <div className="space-y-6">
+          <div className="glass-panel relative overflow-hidden">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <p className="text-white/50 text-sm">Available</p>
+                <h3 className="text-xl font-semibold mt-1">Category Split</h3>
+              </div>
+              <span className="text-sm text-white/60">{expenseChartData.length} categories</span>
+            </div>
+            {expenseChartData.length > 0 ? (
+              <div className="relative">
+                <ResponsiveContainer width="100%" height={240}>
+                  <PieChart>
+                    <Pie
+                      data={expenseChartData}
+                      innerRadius={60}
+                      outerRadius={90}
+                      paddingAngle={2}
+                      dataKey="value"
+                    >
+                      {expenseChartData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={CATEGORY_COLORS[index % CATEGORY_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{
+                        background: 'rgba(15,23,42,0.9)',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        borderRadius: '12px',
+                      }}
+                      formatter={(value) => [formatAmount(value, { skipConversion: true }), 'Spent']}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                  <p className="text-white/60 text-xs">Spent</p>
+                  <p className="text-2xl font-semibold">{formatAmount(totalExpenses)}</p>
+                </div>
+              </div>
+            ) : (
+              <div className="h-56 flex flex-col items-center justify-center text-white/40">
+                <CreditCard className="h-8 w-8 mb-3" />
+                No expenses yet
+              </div>
+            )}
+            {expenseChartData.length > 0 && (
+              <div className="mt-4 grid grid-cols-2 gap-3 text-xs text-white/70">
+                {expenseChartData.slice(0, 4).map((item, index) => (
+                  <div key={item.category} className="flex items-center gap-2">
+                    <span
+                      className="h-2 w-2 rounded-full"
+                      style={{ backgroundColor: CATEGORY_COLORS[index % CATEGORY_COLORS.length] }}
+                    />
+                    <span className="truncate">{item.category}</span>
+                    <span className="ml-auto text-white/50">
+                      {totalExpensesConverted > 0 ? ((item.value / totalExpensesConverted) * 100).toFixed(0) : 0}%
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="glass-card overflow-hidden relative">
+            <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/20 via-teal-400/10 to-cyan-400/20 blur-3xl"></div>
+            <div className="relative">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-white/70 text-sm">My Card</p>
+                  <h3 className="text-3xl font-semibold mt-2">{formatAmount(balance)}</h3>
+                </div>
+                <span className="pill">Virtual</span>
+              </div>
+              <div className="mt-8 space-y-3 text-sm tracking-widest text-white/70">
+                <div className="flex justify-between">
+                  <span>**** **** **** 1289</span>
+                  <span>VISA</span>
+                </div>
+                <div className="flex justify-between text-xs uppercase text-white/50">
+                  <span>Valid Thru</span>
+                  <span>CVV</span>
+                </div>
+                <div className="flex justify-between font-semibold">
+                  <span>12/28</span>
+                  <span>•••</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Expense Categories Pie Chart */}
-        <div className="bg-gradient-to-br from-purple-50 to-purple-100/50 dark:bg-surface-800/80 backdrop-blur-xl rounded-2xl p-6 border border-purple-200 dark:border-surface-700/50">
-          <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Expenses by Category</h3>
-          {expenseByCategory.length > 0 ? (
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={expenseByCategory}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ category, percent }) => `${category} ${(percent * 100).toFixed(0)}%`}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="amount"
+      {/* Transactions + insights */}
+      <div className="grid grid-cols-1 xl:grid-cols-[2fr_1fr] gap-6">
+        <div className="glass-panel">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <p className="text-white/50 text-sm">Transactions</p>
+              <h3 className="text-2xl font-semibold mt-1">Latest Activity</h3>
+            </div>
+            <Link to="/transactions" className="text-sm text-emerald-300 hover:text-emerald-200 transition">
+              View all
+            </Link>
+          </div>
+          {recentTransactions.length > 0 ? (
+            <div className="space-y-3">
+              {recentTransactions.map((transaction) => (
+                <div
+                  key={transaction._id}
+                  className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 hover:bg-white/10 transition"
                 >
-                  {expenseByCategory.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(value) => [`$${value.toLocaleString()}`, 'Amount']} />
-              </PieChart>
-            </ResponsiveContainer>
+                  <div className="flex items-center gap-4">
+                    <div
+                      className={`h-12 w-12 rounded-2xl border-2 flex items-center justify-center ${
+                        transaction.type === 'income'
+                          ? 'border-emerald-300/50 bg-emerald-400/10'
+                          : 'border-rose-300/50 bg-rose-400/10'
+                      }`}
+                    >
+                      {transaction.type === 'income' ? (
+                        <ArrowUpRight className="h-5 w-5 text-emerald-300" />
+                      ) : (
+                        <ArrowDownRight className="h-5 w-5 text-rose-300" />
+                      )}
+                    </div>
+                    <div>
+                      <p className="font-medium">{transaction.description}</p>
+                      <div className="flex items-center gap-2 text-xs text-white/60">
+                        <span className="inline-flex items-center gap-1">
+                          <span
+                            className={`h-2 w-2 rounded-full ${
+                              transaction.type === 'income' ? 'bg-emerald-300' : 'bg-rose-300'
+                            }`}
+                          ></span>
+                          {transaction.category}
+                        </span>
+                        <span>•</span>
+                        <span>{new Date(transaction.date).toLocaleDateString()}</span>
+                        {transaction.isRecurring && (
+                          <>
+                            <span>•</span>
+                            <span className="text-teal-300">Recurring</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div
+                    className={`text-lg font-semibold ${
+                      transaction.type === 'income' ? 'text-emerald-300' : 'text-rose-300'
+                    }`}
+                  >
+                    {transaction.type === 'income' ? '+' : '-'}
+                    {formatAmount(transaction.amount)}
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : (
-            <div className="flex items-center justify-center h-64 text-gray-400">
-              <div className="text-center">
-                <CreditCard className="w-12 h-12 mx-auto mb-2" />
-                <p>No expense data available</p>
-              </div>
+            <div className="text-center py-12 text-white/50">
+              <CreditCard className="mx-auto h-12 w-12 text-white/30 mb-4" />
+              <p>No transactions yet</p>
+              <Link to="/add" className="btn-primary mt-4 inline-flex items-center gap-2">
+                <Plus className="h-4 w-4" />
+                Add transaction
+              </Link>
             </div>
           )}
         </div>
 
-        {/* Monthly Trends Line Chart */}
-        <div className="bg-gradient-to-br from-indigo-50 to-indigo-100/50 dark:bg-surface-800/80 backdrop-blur-xl rounded-2xl p-6 border border-indigo-200 dark:border-surface-700/50">
-          <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Monthly Trends</h3>
-          {monthlyData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={monthlyData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                <XAxis dataKey="month" stroke="#9ca3af" />
-                <YAxis stroke="#9ca3af" />
-                <Tooltip 
-                  formatter={(value, name) => [`$${value.toLocaleString()}`, name === 'income' ? 'Income' : 'Expenses']}
-                  labelStyle={{ color: '#f3f4f6' }}
-                  contentStyle={{ 
-                    backgroundColor: '#1f2937', 
-                    border: '1px solid #374151',
-                    borderRadius: '8px'
-                  }}
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="income" 
-                  stroke="#10b981" 
-                  strokeWidth={3}
-                  dot={{ fill: '#10b981', strokeWidth: 2, r: 4 }}
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="expenses" 
-                  stroke="#ef4444" 
-                  strokeWidth={3}
-                  dot={{ fill: '#ef4444', strokeWidth: 2, r: 4 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="flex items-center justify-center h-64 text-gray-400">
-              <div className="text-center">
-                <TrendingUp className="w-12 h-12 mx-auto mb-2" />
-                <p>No trend data available</p>
+        <div className="space-y-6">
+          <div className="glass-panel">
+            <p className="text-white/50 text-sm">Spending Line</p>
+            <h3 className="text-xl font-semibold mt-1">Balance Snapshot</h3>
+            {balanceTrendData.length > 0 ? (
+              <div className="mt-4 h-32">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={balanceTrendData}>
+                    <defs>
+                      <linearGradient id="balanceGradient" x1="0" x2="0" y1="0" y2="1">
+                        <stop offset="5%" stopColor="#34d399" stopOpacity={0.9} />
+                        <stop offset="95%" stopColor="#0f172a" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <XAxis dataKey="month" stroke="#64748b" />
+                    <YAxis stroke="#64748b" />
+                    <Tooltip
+                      contentStyle={{
+                        background: 'rgba(15,23,42,0.9)',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        borderRadius: '12px',
+                      }}
+                      formatter={(value) => [formatAmount(value, { skipConversion: true }), 'Balance']}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="balance"
+                      stroke="#34d399"
+                      strokeWidth={3}
+                      fill="url(#balanceGradient)"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
               </div>
-            </div>
-          )}
+            ) : (
+              <div className="h-32 flex items-center justify-center text-white/40">Need more data</div>
+            )}
+          </div>
+
+          <div className="glass-panel">
+            <p className="text-white/50 text-sm">Insights</p>
+            <h3 className="text-xl font-semibold mt-2">Invite a partner</h3>
+            <p className="text-white/60 text-sm mt-2">
+              Collaborate with finance partners or family to keep everyone in sync. Share live dashboards and spending
+              alerts instantly.
+            </p>
+            <button className="btn-primary mt-4 w-full">Add friend</button>
+          </div>
         </div>
       </div>
 
       {/* Budget Management */}
-      <div className="bg-gradient-to-br from-orange-50 to-orange-100/50 dark:bg-surface-800/80 backdrop-blur-xl rounded-2xl p-6 border border-orange-200 dark:border-surface-700/50">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+      <div className="glass-panel">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-1">Monthly Budget</h3>
-            <p className="text-gray-600 dark:text-gray-400">Track your spending against your set monthly budget.</p>
+            <p className="text-white/50 text-sm">Monthly Budget</p>
+            <h3 className="text-2xl font-semibold mt-1">Control your burn rate</h3>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <span className="absolute left-3 top-2 text-gray-500">$</span>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            <div className="relative w-full sm:w-48">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40">{currencySymbol}</span>
               <input
-                type="number"
-                className="bg-surface-700/50 border border-surface-600 rounded-lg px-3 py-2 pl-7 w-48 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50"
-                value={budget}
-                min={0}
-                onChange={(e) => setBudget(e.target.value)}
-                placeholder="Set budget"
+                type="text"
+                inputMode="decimal"
+                className="input-field pl-10"
+                value={budgetInput}
+                onChange={handleBudgetInputChange}
+                onFocus={() => setIsBudgetFocused(true)}
+                onBlur={() => {
+                  setIsBudgetFocused(false)
+                  if (budgetInput && !Number.isNaN(parseFloat(budgetInput))) {
+                    setBudgetInput(parseFloat(budgetInput).toFixed(2))
+                  }
+                }}
+                placeholder={`${currencySymbol}0.00`}
               />
             </div>
             <button
-              onClick={() => updateBudget(budget)}
-              disabled={budgetLoading}
-              className="bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-600 hover:to-purple-600 text-white px-6 py-2 rounded-lg font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-glow"
+              onClick={handleBudgetSave}
+              disabled={
+                budgetLoading ||
+                budgetInput === '' ||
+                Number.isNaN(parseFloat(budgetInput))
+              }
+              className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {budgetLoading ? 'Saving…' : 'Save Budget'}
+              {budgetLoading ? 'Saving…' : 'Save budget'}
             </button>
           </div>
         </div>
 
         {budgetError && (
-          <div className="mb-4 rounded-lg bg-red-500/20 border border-red-500/30 p-3 text-sm text-red-400">
+          <div className="mt-4 rounded-2xl border border-rose-400/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
             {budgetError}
           </div>
         )}
 
-        {/* Progress Bar */}
-        <div className="mb-4">
-          <div className="flex justify-between text-sm mb-2">
-            <span className="text-gray-600 dark:text-gray-300">Spent: {formatAmount(spent)}</span>
-            <span className="text-gray-600 dark:text-gray-300">{percent.toFixed(0)}%</span>
+        <div className="mt-6 space-y-3">
+          <div className="flex justify-between text-sm text-white/60">
+            <span>Spent: {formatAmount(spent)}</span>
+            <span>{percent.toFixed(0)}%</span>
           </div>
-          <div className="w-full h-3 bg-gray-200 dark:bg-surface-700 rounded-full overflow-hidden">
+          <div className="h-3 rounded-full bg-white/10 overflow-hidden">
             <div
-              className={`h-3 transition-all duration-500 ${
-                percent >= 100 ? 'bg-red-500' : percent >= 70 ? 'bg-yellow-500' : 'bg-emerald-500'
+              className={`h-full transition-all duration-500 ${
+                percent >= 100 ? 'bg-rose-400' : percent >= 70 ? 'bg-amber-300' : 'bg-emerald-300'
               }`}
               style={{ width: `${Math.min(percent, 100)}%` }}
-            />
+            ></div>
           </div>
-          <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">Remaining: {formatAmount(Math.max(budget - spent, 0))}</div>
+          <div className="text-xs text-white/50">Remaining: {formatAmount(Math.max(budget - spent, 0))}</div>
         </div>
 
-        {/* Alerts */}
         {budget > 0 && (
-          <div className="space-y-2">
+          <div className="mt-4">
             {percent >= 100 ? (
-              <div className="flex items-center gap-2 text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg p-3">
-                <AlertTriangle className="w-5 h-5" />
-                <span className="text-sm font-medium">Over budget! You've exceeded your monthly limit.</span>
+              <div className="flex items-center gap-2 rounded-2xl border border-rose-400/20 bg-rose-500/10 px-4 py-3 text-rose-200">
+                <AlertTriangle className="h-5 w-5" />
+                Over budget! You've exceeded your monthly limit.
               </div>
             ) : percent >= 70 ? (
-              <div className="flex items-center gap-2 text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3">
-                <AlertTriangle className="w-5 h-5" />
-                <span className="text-sm font-medium">Warning! You've used {percent.toFixed(0)}% of your budget.</span>
+              <div className="flex items-center gap-2 rounded-2xl border border-amber-300/30 bg-amber-400/10 px-4 py-3 text-amber-100">
+                <AlertTriangle className="h-5 w-5" />
+                Warning! You've used {percent.toFixed(0)}% of your budget.
               </div>
             ) : (
-              <div className="flex items-center gap-2 text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-3">
-                <CheckCircle className="w-5 h-5" />
-                <span className="text-sm font-medium">Good job! You're within your budget.</span>
+              <div className="flex items-center gap-2 rounded-2xl border border-emerald-300/30 bg-emerald-400/10 px-4 py-3 text-emerald-100">
+                <CheckCircle className="h-5 w-5" />
+                Good job! You're within your budget.
               </div>
             )}
-          </div>
-        )}
-      </div>
-
-      {/* Recent Transactions */}
-      <div className="bg-gradient-to-br from-slate-50 to-slate-100/50 dark:bg-surface-800/80 backdrop-blur-xl rounded-2xl p-6 border border-slate-200 dark:border-surface-700/50">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-xl font-semibold text-gray-900 dark:text-white">Recent Transactions</h3>
-          <Link
-            to="/transactions"
-            className="text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300 text-sm font-medium transition-colors"
-          >
-            View All
-          </Link>
-        </div>
-        {recentTransactions.length > 0 ? (
-          <div className="space-y-3">
-            {recentTransactions.map((transaction) => (
-              <div key={transaction._id} className="flex items-center justify-between p-4 bg-white/60 dark:bg-surface-700/50 rounded-xl border border-gray-200 dark:border-surface-600/50 hover:bg-white/80 dark:hover:bg-surface-700/70 transition-colors">
-                <div className="flex items-center">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center mr-4 border ${
-                    transaction.type === 'income' ? 'bg-emerald-500/20 border-emerald-500/40' : 'bg-red-500/20 border-red-500/40'
-                  }`}>
-                    {transaction.type === 'income' ? (
-                      <ArrowUpRight className="w-5 h-5 text-emerald-400" />
-                    ) : (
-                      <ArrowDownRight className="w-5 h-5 text-red-400" />
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-gray-900 dark:text-white font-medium">{transaction.description}</p>
-                    <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-                      <span>{transaction.category}</span>
-                      <span>•</span>
-                      <span>{new Date(transaction.date).toLocaleDateString()}</span>
-                      {transaction.isRecurring && (
-                        <>
-                          <span>•</span>
-                          <span className="text-cyan-400 font-medium">Recurring</span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                <div className={`text-lg font-semibold ${
-                  transaction.type === 'income' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'
-                }`}>
-                  {transaction.type === 'income' ? '+' : '-'}{formatAmount(transaction.amount)}
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-12">
-            <CreditCard className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-            <p className="text-gray-400 mb-4">No transactions yet</p>
-            <Link
-              to="/add"
-              className="inline-flex items-center gap-2 bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-600 hover:to-purple-600 text-white px-6 py-3 rounded-lg font-medium transition-all duration-200 shadow-glow"
-            >
-              <Plus className="w-5 h-5" />
-              Add Transaction
-            </Link>
           </div>
         )}
       </div>

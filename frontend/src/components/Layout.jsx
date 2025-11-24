@@ -2,126 +2,169 @@ import { Outlet, Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useCurrency } from '../contexts/CurrencyContext'
-import { 
-  Home, 
-  Plus, 
-  List, 
-  BarChart3, 
-  LogOut, 
-  User,
+import {
+  LayoutDashboard,
+  Receipt,
+  Layers,
+  Settings,
+  LogOut,
   Moon,
   Sun,
-  ChevronDown
+  ChevronDown,
+  Search,
+  Bell
 } from 'lucide-react'
 
 export default function Layout() {
   const { user, logout } = useAuth()
   const { isDark, toggleTheme } = useTheme()
-  const { currency, setCurrency, currencies, getCurrentCurrency } = useCurrency()
+  const { currency, setCurrency, currencies } = useCurrency()
   const location = useLocation()
 
-  const navigation = [
-    { name: 'Dashboard', href: '/', icon: Home },
-    { name: 'Add', href: '/add', icon: Plus },
-    { name: 'Transactions', href: '/transactions', icon: List },
-    { name: 'Reports', href: '/reports', icon: BarChart3 },
+  const sidebarNav = [
+    { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+    { name: 'Transactions', href: '/transactions', icon: Receipt },
+    { name: 'Categories', href: '/reports', icon: Layers },
+    { name: 'Settings', href: '/reports', icon: Settings, disabled: true },
   ]
 
+  const mobileNav = [
+    { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+    { name: 'Transactions', href: '/transactions', icon: Receipt },
+    { name: 'Reports', href: '/reports', icon: Layers },
+  ]
+
+  const initial = user?.name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'
+
   return (
-    <div className="min-h-screen dark:bg-gradient-to-br dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 bg-gradient-to-br from-gray-50 via-gray-100 to-gray-200">
-      {/* Background Effects */}
-      <div className="fixed inset-0 bg-gradient-to-br from-cyan-500/5 via-transparent to-purple-500/5 dark:from-cyan-500/5 dark:via-transparent dark:to-purple-500/5 pointer-events-none" />
-      <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-cyan-500/10 via-transparent to-transparent dark:from-cyan-500/10 dark:via-transparent dark:to-transparent pointer-events-none" />
-      
-      <div className="flex flex-col h-screen">
-        {/* Top Header */}
-        <header className="bg-white/80 dark:bg-surface-800/80 backdrop-blur-xl border-b border-gray-200 dark:border-surface-700/50 px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <h1 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-500 to-purple-500 dark:from-cyan-400 dark:to-purple-400">
-                Xpense
-              </h1>
-            </div>
-            
-            <div className="flex items-center space-x-4">
-              {/* Currency Selector */}
-              <div className="relative">
-                <select
-                  value={currency}
-                  onChange={(e) => setCurrency(e.target.value)}
-                  className="appearance-none bg-gray-100 dark:bg-surface-700/50 hover:bg-gray-200 dark:hover:bg-surface-600/50 text-gray-900 dark:text-white px-3 py-2 pr-8 rounded-lg text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
-                >
-                  {currencies.map((curr) => (
-                    <option key={curr.code} value={curr.code}>
-                      {curr.symbol} {curr.code}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-600 dark:text-gray-400 pointer-events-none" />
-              </div>
-
-              {/* User Info */}
-              <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 bg-gradient-to-r from-cyan-500 to-purple-500 rounded-lg flex items-center justify-center">
-                  <User className="w-4 h-4 text-white" />
-                </div>
-                <div className="hidden sm:block">
-                  <p className="text-gray-900 dark:text-white font-medium text-sm">{user?.name}</p>
-                  <p className="text-gray-600 dark:text-gray-400 text-xs">{user?.email}</p>
-                </div>
-              </div>
-
-              {/* Theme Toggle */}
-              <button
-                onClick={toggleTheme}
-                className="p-2 rounded-lg bg-gray-100 dark:bg-surface-700/50 hover:bg-gray-200 dark:hover:bg-surface-600/50 transition-colors"
-              >
-                {isDark ? (
-                  <Sun className="w-5 h-5 text-yellow-500" />
-                ) : (
-                  <Moon className="w-5 h-5 text-gray-600" />
-                )}
-              </button>
-
-              {/* Logout */}
-              <button
-                onClick={logout}
-                className="p-2 rounded-lg bg-red-100 dark:bg-red-500/20 hover:bg-red-200 dark:hover:bg-red-500/30 text-red-600 dark:text-red-400 transition-colors"
-              >
-                <LogOut className="w-5 h-5" />
-              </button>
-            </div>
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.15),transparent_45%),_radial-gradient(circle_at_bottom,_rgba(45,212,191,0.08),transparent_45%),_linear-gradient(135deg,#0f2027,#203a43,#2c5364)] text-gray-100">
+      <div className="flex min-h-screen">
+        {/* Sidebar */}
+        <aside className="hidden lg:flex fixed inset-y-0 left-0 w-72 flex-col border-r border-white/10 bg-white/5 backdrop-blur-2xl">
+          <div className="px-8 pt-8 pb-6">
+            <div className="text-sm uppercase tracking-[0.3em] text-emerald-300">Xpense</div>
+            <p className="mt-3 text-2xl font-semibold">Control Center</p>
           </div>
-        </header>
-
-        {/* Main Content */}
-        <main className="flex-1 overflow-y-auto p-6 pb-20">
-          <Outlet />
-        </main>
-
-        {/* Bottom Navigation */}
-        <nav className="fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-surface-800/90 backdrop-blur-xl border-t border-gray-200 dark:border-surface-700/50 px-4 py-2">
-          <div className="flex justify-around items-center max-w-md mx-auto">
-            {navigation.map((item) => {
+          <nav className="flex-1 px-6 space-y-2">
+            {sidebarNav.map((item) => {
               const isActive = location.pathname === item.href
-              return (
+              const Icon = item.icon
+              return item.disabled ? (
+                <div
+                  key={item.name}
+                  className="flex items-center gap-3 rounded-2xl px-4 py-3 text-sm text-white/30 border border-white/5 cursor-not-allowed"
+                >
+                  <Icon className="h-5 w-5" />
+                  {item.name}
+                </div>
+              ) : (
                 <Link
                   key={item.name}
                   to={item.href}
-                  className={`flex flex-col items-center space-y-1 px-4 py-3 rounded-xl transition-all duration-200 group ${
+                  className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition-all ${
                     isActive
-                      ? 'bg-gradient-to-r from-cyan-500/20 to-purple-500/20 border border-cyan-500/30 text-cyan-600 dark:text-cyan-400 shadow-lg shadow-cyan-500/10'
-                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-surface-700/50'
+                      ? 'bg-white/10 text-white shadow-neon'
+                      : 'text-white/60 hover:text-white hover:bg-white/5'
                   }`}
                 >
-                  <item.icon className={`w-6 h-6 ${isActive ? 'text-cyan-600 dark:text-cyan-400' : 'text-gray-600 dark:text-gray-400 group-hover:text-gray-900 dark:group-hover:text-white'}`} />
-                  <span className="text-xs font-medium">{item.name}</span>
+                  <Icon className="h-5 w-5" />
+                  {item.name}
                 </Link>
               )
             })}
+          </nav>
+          <div className="px-6 py-6 border-t border-white/10">
+            <button
+              onClick={logout}
+              className="w-full flex items-center justify-center gap-2 rounded-2xl border border-white/10 px-4 py-3 text-sm text-white/80 hover:bg-white/10 transition"
+            >
+              <LogOut className="h-4 w-4" />
+              Log out
+            </button>
           </div>
-        </nav>
+        </aside>
+
+        {/* Main column */}
+        <div className="flex-1 w-full lg:ml-72">
+          <div className="px-4 py-4 sm:px-8 sm:py-6">
+            {/* Top bar */}
+            <header className="glass-card p-5 sm:p-6 mb-6">
+              <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                <div className="flex-1 flex items-center gap-3 bg-white/5 rounded-2xl px-4 py-2 border border-white/10">
+                  <Search className="h-5 w-5 text-white/50" />
+                  <input
+                    type="text"
+                    placeholder="Search payment"
+                    className="w-full bg-transparent text-sm text-white placeholder:text-white/40 focus:outline-none"
+                  />
+                </div>
+                <div className="flex items-center gap-4">
+                  {/* Currency */}
+                  <div className="relative">
+                    <select
+                      value={currency}
+                      onChange={(e) => setCurrency(e.target.value)}
+                      className="appearance-none bg-white/5 border border-white/10 rounded-2xl pl-4 pr-10 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-400/40"
+                    >
+                      {currencies.map((curr) => (
+                        <option key={curr.code} value={curr.code} className="bg-slate-900 text-white">
+                          {curr.symbol} {curr.code}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/50 pointer-events-none" />
+                  </div>
+                  {/* Theme */}
+                  <button
+                    onClick={toggleTheme}
+                    className="rounded-2xl border border-white/10 p-3 hover:bg-white/10 transition"
+                  >
+                    {isDark ? <Sun className="h-5 w-5 text-yellow-300" /> : <Moon className="h-5 w-5 text-white/70" />}
+                  </button>
+                  {/* Notifications */}
+                  <button className="rounded-2xl border border-white/10 p-3 hover:bg-white/10 transition relative">
+                    <Bell className="h-5 w-5 text-white/70" />
+                    <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-emerald-400"></span>
+                  </button>
+                  {/* Profile */}
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      <p className="text-xs text-white/60">Hi,</p>
+                      <p className="text-sm font-semibold text-white">{user?.name || 'Explorer'}</p>
+                    </div>
+                    <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-emerald-400 via-teal-400 to-cyan-400 text-slate-900 font-bold flex items-center justify-center">
+                      {initial}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </header>
+
+            <main className="pb-24">
+              <Outlet />
+            </main>
+          </div>
+        </div>
       </div>
+
+      {/* Mobile nav */}
+      <nav className="lg:hidden fixed bottom-4 left-1/2 -translate-x-1/2 w-[90%] max-w-md glass-card px-4 py-3 flex items-center justify-between">
+        {mobileNav.map((item) => {
+          const isActive = location.pathname === item.href
+          return (
+            <Link
+              key={item.name}
+              to={item.href}
+              className={`flex flex-col items-center text-xs font-medium ${
+                isActive ? 'text-emerald-300' : 'text-white/50'
+              }`}
+            >
+              <item.icon className={`h-5 w-5 mb-1 ${isActive ? 'text-emerald-300' : 'text-white/50'}`} />
+              {item.name}
+            </Link>
+          )
+        })}
+      </nav>
     </div>
   )
 }
