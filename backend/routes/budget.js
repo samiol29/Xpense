@@ -25,11 +25,10 @@ router.get('/', async (req, res) => {
   let alert = null;
   if (budget > 0) {
     if (percent >= 100) alert = 'over';
-    else if (percent >= 100) alert = 'at_100';
     else if (percent >= 70) alert = 'at_70';
   }
 
-  res.json({ budget, spent, remaining: Math.max(budget - spent, 0), percent, alert });
+  res.json({ monthlyBudget: budget, budget, spent, remaining: Math.max(budget - spent, 0), percent, alert });
 });
 
 // Update monthly budget
@@ -43,7 +42,29 @@ router.put('/', async (req, res) => {
     { monthlyBudget },
     { new: true, select: '_id name email monthlyBudget' }
   );
-  res.json({ user });
+  if (!user) {
+    return res.status(404).json({ message: 'User not found' });
+  }
+  
+  // Calculate current month's spent amount
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+  
+  const expensesAgg = await Transaction.aggregate([
+    { $match: { userId: user._id, type: 'expense', date: { $gte: start, $lte: end } } },
+    { $group: { _id: null, total: { $sum: '$amount' } } }
+  ]);
+  const spent = expensesAgg[0]?.total || 0;
+  const percent = monthlyBudget > 0 ? (spent / monthlyBudget) * 100 : 0;
+  
+  res.json({ 
+    user,
+    monthlyBudget: user.monthlyBudget,
+    spent,
+    remaining: Math.max(monthlyBudget - spent, 0),
+    percent
+  });
 });
 
 export default router;

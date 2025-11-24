@@ -27,6 +27,7 @@ function AppRoutes() {
         <Route index element={<Dashboard />} />
         <Route path="transactions" element={<Transactions />} />
         <Route path="add" element={<AddTransaction />} />
+        <Route path="add-transaction" element={<AddTransaction />} />
         <Route path="reports" element={<Reports />} />
       </Route>
     </Routes>

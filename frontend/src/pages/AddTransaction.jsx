@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 import * as yup from 'yup'
 import axios from 'axios'
-import { ArrowLeft, Save } from 'lucide-react'
+import { ArrowLeft, Save, Plus } from 'lucide-react'
 
 const schema = yup.object({
   type: yup.string().required('Type is required'),
@@ -19,8 +19,9 @@ export default function AddTransaction() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState(false)
 
-  const { register, handleSubmit, formState: { errors }, watch } = useForm({
+  const { register, handleSubmit, formState: { errors }, watch, reset } = useForm({
     resolver: yupResolver(schema),
     defaultValues: {
       type: 'expense',
@@ -34,15 +35,37 @@ export default function AddTransaction() {
   const onSubmit = async (data) => {
     setLoading(true)
     setError('')
+    setSuccess(false)
 
     try {
       await axios.post('/api/transactions', data)
-      navigate('/transactions')
+      setSuccess(true)
+      // Reset form to default values
+      reset({
+        type: 'expense',
+        date: new Date().toISOString().split('T')[0],
+        isRecurring: false,
+        description: '',
+        amount: '',
+        category: ''
+      })
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to create transaction')
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleAddAnother = () => {
+    setSuccess(false)
+    reset({
+      type: 'expense',
+      date: new Date().toISOString().split('T')[0],
+      isRecurring: false,
+      description: '',
+      amount: '',
+      category: ''
+    })
   }
 
   const categories = watchType === 'income' 
@@ -65,6 +88,13 @@ export default function AddTransaction() {
       {/* Form */}
       <div className="card">
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          {success && (
+            <div className="rounded-md bg-green-50 p-4 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
+              <div className="text-sm text-green-700 dark:text-green-400 font-medium">
+                Transaction added successfully!
+              </div>
+            </div>
+          )}
           {error && (
             <div className="rounded-md bg-red-50 p-4 dark:bg-red-900/20">
               <div className="text-sm text-red-700 dark:text-red-400">{error}</div>
@@ -213,6 +243,16 @@ export default function AddTransaction() {
             >
               Cancel
             </button>
+            {success && (
+              <button
+                type="button"
+                onClick={handleAddAnother}
+                className="btn-primary"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Add Another
+              </button>
+            )}
             <button
               type="submit"
               disabled={loading}
