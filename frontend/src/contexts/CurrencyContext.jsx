@@ -11,9 +11,17 @@ const SUPPORTED_CURRENCIES = [
 
 const RATES_ENDPOINT = 'https://open.er-api.com/v6/latest/USD'
 
+// Fallback exchange rates (approximate, updated periodically)
+const FALLBACK_RATES = {
+  USD: 1,
+  INR: 83.5,
+  EUR: 0.92,
+  GBP: 0.79,
+}
+
 export function CurrencyProvider({ children }) {
   const [currency, setCurrency] = useState(() => localStorage.getItem('currency') || 'INR')
-  const [rates, setRates] = useState({ USD: 1 })
+  const [rates, setRates] = useState(FALLBACK_RATES)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -37,7 +45,9 @@ export function CurrencyProvider({ children }) {
         setError('')
       } catch (err) {
         console.error('Currency fetch error:', err)
-        setError('Unable to fetch latest currency rates. Values may be inaccurate.')
+        // Use fallback rates when API fails
+        setRates(FALLBACK_RATES)
+        setError('Unable to fetch latest currency rates. Using approximate values.')
       } finally {
         setLoading(false)
       }

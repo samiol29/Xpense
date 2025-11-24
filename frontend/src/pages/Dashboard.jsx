@@ -46,7 +46,7 @@ export default function Dashboard() {
     } else {
       setBudgetInput('')
     }
-  }, [budget, convertAmount, currency, isBudgetFocused])
+  }, [budget, convertAmount, currency])
 
   const loadTransactions = async () => {
     try {
